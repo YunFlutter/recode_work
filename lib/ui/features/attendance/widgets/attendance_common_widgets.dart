@@ -65,6 +65,8 @@ class StatusPanel extends StatelessWidget {
     final status = record?.status;
     final color = status?.color ?? const Color(0xFF2563EB);
     final workSessionCount = record?.workSessions.length ?? 0;
+    final hasAdditionalShift = record?.hasAdditionalShift ?? false;
+    final isOvernight = record?.isOvernight ?? false;
 
     return AttendancePanel(
       color:
@@ -121,6 +123,30 @@ class StatusPanel extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '근무 시간 $workSessionCount회 기록됨',
+                  textAlign:
+                      useVerticalLayout ? TextAlign.center : TextAlign.start,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+              if (hasAdditionalShift) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '오후 추가 출근 기록됨',
+                  textAlign:
+                      useVerticalLayout ? TextAlign.center : TextAlign.start,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+              if (isOvernight) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '다음날까지 야근 기록됨',
                   textAlign:
                       useVerticalLayout ? TextAlign.center : TextAlign.start,
                   style: const TextStyle(

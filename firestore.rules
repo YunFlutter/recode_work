@@ -50,12 +50,27 @@ service cloud.firestore {
         (value.size() < 10 || validWorkSession(value[9]));
     }
 
+    function validQuickActions(data) {
+      return (
+          data.schemaVersion == 2 &&
+          !data.keys().hasAny(['hasAdditionalShift', 'isOvernight'])
+        ) || (
+          data.schemaVersion == 3 &&
+          data.keys().hasAll(['hasAdditionalShift', 'isOvernight']) &&
+          data.hasAdditionalShift is bool &&
+          data.isOvernight is bool &&
+          (!data.isOvernight || data.status == 'overtime')
+        );
+    }
+
     function validAttendanceRecord() {
       return request.resource.data.keys().hasOnly([
           'status',
           'startTime',
           'endTime',
           'workSessions',
+          'hasAdditionalShift',
+          'isOvernight',
           'memo',
           'schemaVersion',
           'updatedAt'
@@ -70,9 +85,9 @@ service cloud.firestore {
         validTime(request.resource.data.startTime) &&
         validTime(request.resource.data.endTime) &&
         validWorkSessions(request.resource.data.workSessions) &&
+        validQuickActions(request.resource.data) &&
         request.resource.data.memo is string &&
         request.resource.data.memo.size() <= 2000 &&
-        request.resource.data.schemaVersion == 2 &&
         request.resource.data.updatedAt == request.time;
     }
 

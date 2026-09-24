@@ -8,6 +8,7 @@ import '../../../../domain/models/month_summary.dart';
 import '../../../../domain/models/work_session.dart';
 import '../../../core/date_formatters.dart';
 import '../widgets/attendance_common_widgets.dart';
+import '../widgets/work_quick_actions.dart';
 import '../widgets/work_sessions_editor.dart';
 
 class CalendarView extends StatelessWidget {
@@ -36,6 +37,8 @@ class CalendarView extends StatelessWidget {
     required DateTime date,
     required AttendanceStatus status,
     required List<WorkSession> workSessions,
+    required bool hasAdditionalShift,
+    required bool isOvernight,
     required String memo,
   })
   onSaveDetail;
@@ -43,6 +46,7 @@ class CalendarView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
+      key: const ValueKey('calendarScrollView'),
       children: [
         Row(
           children: [
@@ -112,9 +116,22 @@ class CalendarGrid extends StatelessWidget {
     final leadingBlanks = firstDay.weekday % 7;
     final days = daysInMonth(month);
     final itemCount = leadingBlanks + days.length;
+    final specialDates =
+        days.where((date) {
+          final record = recordFor(date);
+          return record?.hasAdditionalShift == true ||
+              record?.isOvernight == true;
+        }).toList();
 
     return Column(
       children: [
+        if (specialDates.isNotEmpty) ...[
+          _CalendarSpecialRecordsPanel(
+            dates: specialDates,
+            recordFor: recordFor,
+          ),
+          const SizedBox(height: 14),
+        ],
         const Row(
           children: [
             WeekdayLabel('일'),
@@ -143,9 +160,15 @@ class CalendarGrid extends StatelessWidget {
             }
 
             final date = days[index - leadingBlanks];
+            final continuesOvernight =
+                recordFor(
+                  date.subtract(const Duration(days: 1)),
+                )?.isOvernight ??
+                false;
             return CalendarDayButton(
               date: date,
               record: recordFor(date),
+              continuesOvernight: continuesOvernight,
               isSelected: isSameDate(date, selectedDate),
               isToday: isSameDate(date, today),
               onPressed: () => onSelectDate(date),
@@ -162,6 +185,7 @@ class CalendarDayButton extends StatelessWidget {
     super.key,
     required this.date,
     required this.record,
+    required this.continuesOvernight,
     required this.isSelected,
     required this.isToday,
     required this.onPressed,
@@ -169,6 +193,7 @@ class CalendarDayButton extends StatelessWidget {
 
   final DateTime date;
   final AttendanceRecord? record;
+  final bool continuesOvernight;
   final bool isSelected;
   final bool isToday;
   final VoidCallback onPressed;
@@ -177,10 +202,20 @@ class CalendarDayButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final statusColor = record?.status.color ?? const Color(0xFFE5E7EB);
     final foreground = record == null ? const Color(0xFF1F2937) : Colors.white;
+    final hasAdditionalShift = record?.hasAdditionalShift ?? false;
+    final isOvernight = record?.isOvernight ?? false;
+    final previousDate = date.subtract(const Duration(days: 1));
+    final nextDate = date.add(const Duration(days: 1));
+    final semanticsDetails = <String>[
+      '${date.day}일 ${record?.status.label ?? '미기록'}',
+      if (hasAdditionalShift) '오후 추가 출근',
+      if (isOvernight) '다음날까지 야근',
+      if (continuesOvernight) '전날부터 이어진 야근',
+    ].join(', ');
 
     return Semantics(
       button: true,
-      label: '${date.day}일 ${record?.status.label ?? '미기록'}',
+      label: semanticsDetails,
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(8),
@@ -191,12 +226,14 @@ class CalendarDayButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color:
-                  isSelected
+                  isOvernight || continuesOvernight
+                      ? const Color(0xFF7C3AED)
+                      : isSelected
                       ? const Color(0xFF111827)
                       : isToday
                       ? const Color(0xFF2563EB)
                       : const Color(0xFFD1D5DB),
-              width: isSelected ? 3 : 1.5,
+              width: isSelected || isOvernight || continuesOvernight ? 3 : 1.5,
             ),
           ),
           padding: const EdgeInsets.all(4),
@@ -232,8 +269,209 @@ class CalendarDayButton extends StatelessWidget {
                   ),
                 ),
               ),
+              if (hasAdditionalShift || isOvernight || continuesOvernight) ...[
+                const SizedBox(height: 3),
+                Flexible(
+                  flex:
+                      (hasAdditionalShift ? 1 : 0) +
+                      (isOvernight ? 1 : 0) +
+                      (continuesOvernight ? 1 : 0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (hasAdditionalShift)
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: _CalendarRecordMarker(
+                              key: ValueKey(
+                                'calendarAdditional-${date.year}-${date.month}-${date.day}',
+                              ),
+                              label: '오후+',
+                              backgroundColor: const Color(0xFFFCD34D),
+                              foregroundColor: const Color(0xFF422006),
+                            ),
+                          ),
+                        ),
+                      if (hasAdditionalShift &&
+                          (isOvernight || continuesOvernight))
+                        const SizedBox(height: 3),
+                      if (isOvernight)
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: _CalendarRecordMarker(
+                              key: ValueKey(
+                                'calendarOvernight-${date.year}-${date.month}-${date.day}',
+                              ),
+                              label: '→${nextDate.day}일',
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF5B21B6),
+                            ),
+                          ),
+                        ),
+                      if (isOvernight && continuesOvernight)
+                        const SizedBox(height: 3),
+                      if (continuesOvernight)
+                        Expanded(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: _CalendarRecordMarker(
+                              key: ValueKey(
+                                'calendarOvernightContinuation-${date.year}-${date.month}-${date.day}',
+                              ),
+                              label: '←${previousDate.day}일',
+                              backgroundColor: const Color(0xFFF3E8FF),
+                              foregroundColor: const Color(0xFF5B21B6),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarSpecialRecordsPanel extends StatelessWidget {
+  const _CalendarSpecialRecordsPanel({
+    required this.dates,
+    required this.recordFor,
+  });
+
+  final List<DateTime> dates;
+  final AttendanceRecord? Function(DateTime date) recordFor;
+
+  @override
+  Widget build(BuildContext context) {
+    return AttendancePanel(
+      color: const Color(0xFFFAF5FF),
+      borderColor: const Color(0xFF7C3AED),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            '추가 근무 기록',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 10),
+          for (final date in dates) ...[
+            if (recordFor(date)?.hasAdditionalShift == true)
+              _CalendarSpecialRecordCard(
+                key: ValueKey(
+                  'calendarAdditionalSummary-${date.year}-${date.month}-${date.day}',
+                ),
+                icon: Icons.wb_sunny_outlined,
+                text: '${date.month}월 ${date.day}일  오후 추가 출근',
+                color: const Color(0xFFB45309),
+                backgroundColor: const Color(0xFFFFFBEB),
+              ),
+            if (recordFor(date)?.hasAdditionalShift == true &&
+                recordFor(date)?.isOvernight == true)
+              const SizedBox(height: 8),
+            if (recordFor(date)?.isOvernight == true)
+              _CalendarSpecialRecordCard(
+                key: ValueKey(
+                  'calendarOvernightSummary-${date.year}-${date.month}-${date.day}',
+                ),
+                icon: Icons.dark_mode_outlined,
+                text: _overnightDescription(date),
+                color: const Color(0xFF6D28D9),
+                backgroundColor: const Color(0xFFF3E8FF),
+              ),
+            if (date != dates.last) const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _overnightDescription(DateTime date) {
+    final nextDay = date.add(const Duration(days: 1));
+    return '${date.month}월 ${date.day}일  →  '
+        '${nextDay.month}월 ${nextDay.day}일\n'
+        '다음날까지 야근 (이어짐)';
+  }
+}
+
+class _CalendarSpecialRecordCard extends StatelessWidget {
+  const _CalendarSpecialRecordCard({
+    super.key,
+    required this.icon,
+    required this.text,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color, width: 2),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 28, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: color,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                height: 1.25,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarRecordMarker extends StatelessWidget {
+  const _CalendarRecordMarker({
+    super.key,
+    required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        style: TextStyle(
+          color: foregroundColor,
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+          height: 1,
         ),
       ),
     );
@@ -254,6 +492,8 @@ class RecordEditor extends StatefulWidget {
     required DateTime date,
     required AttendanceStatus status,
     required List<WorkSession> workSessions,
+    required bool hasAdditionalShift,
+    required bool isOvernight,
     required String memo,
   })
   onSave;
@@ -268,6 +508,8 @@ class _RecordEditorState extends State<RecordEditor> {
   late List<WorkSession> _workSessions = List<WorkSession>.of(
     widget.record?.workSessions ?? const <WorkSession>[],
   );
+  late bool _hasAdditionalShift = widget.record?.hasAdditionalShift ?? false;
+  late bool _isOvernight = widget.record?.isOvernight ?? false;
   late final TextEditingController _memoController = TextEditingController(
     text: widget.record?.memo ?? '',
   );
@@ -285,6 +527,8 @@ class _RecordEditorState extends State<RecordEditor> {
       date: widget.date,
       status: _status,
       workSessions: _workSessions,
+      hasAdditionalShift: _hasAdditionalShift,
+      isOvernight: _isOvernight,
       memo: _memoController.text,
     );
   }
@@ -296,6 +540,27 @@ class _RecordEditorState extends State<RecordEditor> {
 
   Future<void> _updateWorkSessions(List<WorkSession> workSessions) async {
     setState(() => _workSessions = List<WorkSession>.of(workSessions));
+    await _saveNow();
+  }
+
+  Future<void> _updateQuickActions({
+    required bool hasAdditionalShift,
+    required bool isOvernight,
+  }) async {
+    final wasOvernight = _isOvernight;
+    setState(() {
+      _hasAdditionalShift = hasAdditionalShift;
+      _isOvernight = isOvernight;
+      if (isOvernight) {
+        _status = AttendanceStatus.overtime;
+      } else if (wasOvernight && _status == AttendanceStatus.overtime) {
+        _status = AttendanceStatus.present;
+      } else if (hasAdditionalShift &&
+          (_status == AttendanceStatus.absent ||
+              _status == AttendanceStatus.rest)) {
+        _status = AttendanceStatus.present;
+      }
+    });
     await _saveNow();
   }
 
@@ -357,16 +622,45 @@ class _RecordEditorState extends State<RecordEditor> {
                       vertical: 12,
                     ),
                     onSelected: (_) {
-                      setState(() => _status = status);
+                      setState(() {
+                        _status = status;
+                        if (status != AttendanceStatus.overtime) {
+                          _isOvernight = false;
+                        }
+                      });
                       _saveNow();
                     },
                   );
                 }).toList(),
           ),
           const SizedBox(height: 18),
-          WorkSessionsEditor(
-            sessions: _workSessions,
-            onChanged: _updateWorkSessions,
+          WorkQuickActions(
+            hasAdditionalShift: _hasAdditionalShift,
+            isOvernight: _isOvernight,
+            onChanged: _updateQuickActions,
+          ),
+          const SizedBox(height: 12),
+          Material(
+            color: Colors.transparent,
+            child: ExpansionTile(
+              key: const ValueKey('optionalTimeEditor'),
+              tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+              childrenPadding: const EdgeInsets.only(bottom: 12),
+              title: const Text(
+                '시간도 적기 (선택)',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '필요할 때만 열어서 출근·퇴근 시간을 입력하세요.',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              children: [
+                WorkSessionsEditor(
+                  sessions: _workSessions,
+                  onChanged: _updateWorkSessions,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 18),
           TextField(
@@ -396,7 +690,7 @@ class _RecordEditorState extends State<RecordEditor> {
 
 double _calendarCellHeight(BuildContext context) {
   final textScale = MediaQuery.textScalerOf(context).scale(1);
-  return (70 * textScale).clamp(70, 132).toDouble();
+  return (84 * textScale).clamp(84, 148).toDouble();
 }
 
 class WeekdayLabel extends StatelessWidget {

@@ -142,6 +142,11 @@ class AttendanceViewModel extends ChangeNotifier {
       AttendanceRecord(
         status: status,
         workSessions: previous?.workSessions ?? const <WorkSession>[],
+        hasAdditionalShift: previous?.hasAdditionalShift ?? false,
+        isOvernight:
+            status == AttendanceStatus.overtime
+                ? previous?.isOvernight ?? false
+                : false,
         memo: previous?.memo ?? '',
       ),
     );
@@ -155,6 +160,8 @@ class AttendanceViewModel extends ChangeNotifier {
     required DateTime date,
     required AttendanceStatus status,
     required List<WorkSession> workSessions,
+    required bool hasAdditionalShift,
+    required bool isOvernight,
     required String memo,
   }) async {
     final key = dateOnly(date);
@@ -163,6 +170,8 @@ class AttendanceViewModel extends ChangeNotifier {
       AttendanceRecord(
         status: status,
         workSessions: List<WorkSession>.unmodifiable(workSessions),
+        hasAdditionalShift: hasAdditionalShift,
+        isOvernight: status == AttendanceStatus.overtime && isOvernight,
         memo: memo.trim(),
       ),
     );

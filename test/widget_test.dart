@@ -60,6 +60,11 @@ void main() {
 
     await tester.tap(find.text('달력'));
     await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('calendarScrollView')),
+      const Offset(0, -900),
+    );
+    await tester.pumpAndSettle();
 
     expect(find.text('현재 기록: 출근함'), findsOneWidget);
     expect(find.text('누르면 바로 저장됩니다.'), findsOneWidget);
@@ -79,6 +84,11 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('calendarScrollView')),
+      const Offset(0, -900),
+    );
+    await tester.pumpAndSettle();
 
     expect(find.text('현재 기록: 결근 (자동 표시, 수정 가능)'), findsOneWidget);
   });
@@ -95,12 +105,18 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('calendarScrollView')),
+      const Offset(0, -900),
+    );
+    await tester.pumpAndSettle();
 
     expect(find.text('현재 기록: 쉬는 날 (자동 표시, 수정 가능)'), findsOneWidget);
   });
 
   testWidgets('record editor status choices save immediately', (tester) async {
     AttendanceStatus? savedStatus;
+    bool? savedOvernight;
 
     await tester.pumpWidget(
       MaterialApp(
@@ -108,14 +124,20 @@ void main() {
           body: SingleChildScrollView(
             child: RecordEditor(
               date: DateTime(2026, 5, 1),
-              record: const AttendanceRecord(status: AttendanceStatus.absent),
+              record: const AttendanceRecord(
+                status: AttendanceStatus.overtime,
+                isOvernight: true,
+              ),
               onSave: ({
                 required date,
                 required status,
                 required workSessions,
+                required hasAdditionalShift,
+                required isOvernight,
                 required memo,
               }) async {
                 savedStatus = status;
+                savedOvernight = isOvernight;
               },
             ),
           ),
@@ -127,6 +149,7 @@ void main() {
     await tester.pump();
 
     expect(savedStatus, AttendanceStatus.present);
+    expect(savedOvernight, isFalse);
   });
 
   testWidgets('record editor exposes overtime and manual time selection', (
@@ -147,6 +170,8 @@ void main() {
                     required date,
                     required status,
                     required workSessions,
+                    required hasAdditionalShift,
+                    required isOvernight,
                     required memo,
                   }) async {},
             ),
@@ -154,6 +179,14 @@ void main() {
         ),
       ),
     );
+
+    expect(find.text('오후 추가 출근'), findsOneWidget);
+    expect(find.text('다음날까지 야근'), findsOneWidget);
+
+    final optionalTimeEditor = find.byKey(const ValueKey('optionalTimeEditor'));
+    await tester.ensureVisible(optionalTimeEditor);
+    await tester.tap(optionalTimeEditor);
+    await tester.pumpAndSettle();
 
     expect(find.text('야근'), findsOneWidget);
     expect(find.text('시간 선택'), findsNWidgets(2));
@@ -176,6 +209,8 @@ void main() {
                   required date,
                   required status,
                   required workSessions,
+                  required hasAdditionalShift,
+                  required isOvernight,
                   required memo,
                 }) async {
                   savedWorkSessions = List<WorkSession>.of(workSessions);
@@ -186,9 +221,18 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const ValueKey('addWorkSessionButton')));
+      final optionalTimeEditor = find.byKey(
+        const ValueKey('optionalTimeEditor'),
+      );
+      await tester.ensureVisible(optionalTimeEditor);
+      await tester.tap(optionalTimeEditor);
+      await tester.pumpAndSettle();
+      final addButton = find.byKey(const ValueKey('addWorkSessionButton'));
+      await tester.ensureVisible(addButton);
+      await tester.tap(addButton);
       await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('addWorkSessionButton')));
+      await tester.ensureVisible(addButton);
+      await tester.tap(addButton);
       await tester.pump();
 
       expect(savedWorkSessions, hasLength(2));
@@ -196,6 +240,59 @@ void main() {
       expect(find.text('근무 2'), findsOneWidget);
     },
   );
+
+  testWidgets('quick buttons save afternoon work and overnight work', (
+    tester,
+  ) async {
+    AttendanceStatus? savedStatus;
+    bool? savedAdditionalShift;
+    bool? savedOvernight;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: RecordEditor(
+              date: DateTime(2026, 5, 1),
+              record: const AttendanceRecord(status: AttendanceStatus.absent),
+              onSave: ({
+                required date,
+                required status,
+                required workSessions,
+                required hasAdditionalShift,
+                required isOvernight,
+                required memo,
+              }) async {
+                savedStatus = status;
+                savedAdditionalShift = hasAdditionalShift;
+                savedOvernight = isOvernight;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final additionalButton = find.byKey(
+      const ValueKey('additionalShiftButton'),
+    );
+    await tester.ensureVisible(additionalButton);
+    await tester.tap(additionalButton);
+    await tester.pump();
+
+    expect(savedStatus, AttendanceStatus.present);
+    expect(savedAdditionalShift, isTrue);
+    expect(savedOvernight, isFalse);
+
+    final overnightButton = find.byKey(const ValueKey('overnightButton'));
+    await tester.ensureVisible(overnightButton);
+    await tester.tap(overnightButton);
+    await tester.pump();
+
+    expect(savedStatus, AttendanceStatus.overtime);
+    expect(savedAdditionalShift, isTrue);
+    expect(savedOvernight, isTrue);
+    expect(find.text('다음날까지 야근 기록됨'), findsOneWidget);
+  });
 
   testWidgets('multiple work sessions tolerate narrow large-text layouts', (
     tester,
@@ -229,6 +326,8 @@ void main() {
                       required date,
                       required status,
                       required workSessions,
+                      required hasAdditionalShift,
+                      required isOvernight,
                       required memo,
                     }) async {},
               ),
@@ -237,6 +336,11 @@ void main() {
         ),
       ),
     );
+
+    final optionalTimeEditor = find.byKey(const ValueKey('optionalTimeEditor'));
+    await tester.ensureVisible(optionalTimeEditor);
+    await tester.tap(optionalTimeEditor);
+    await tester.pumpAndSettle();
 
     expect(find.text('근무 1'), findsOneWidget);
     expect(find.text('근무 2'), findsOneWidget);
@@ -257,6 +361,13 @@ void main() {
               focusedMonth: DateTime(2026, 5),
               selectedDate: DateTime(2026, 5, 5),
               recordFor: (date) {
+                if (date.day == 5) {
+                  return const AttendanceRecord(
+                    status: AttendanceStatus.overtime,
+                    hasAdditionalShift: true,
+                    isOvernight: true,
+                  );
+                }
                 if (date.weekday == DateTime.saturday ||
                     date.weekday == DateTime.sunday) {
                   return const AttendanceRecord(status: AttendanceStatus.rest);
@@ -284,6 +395,8 @@ void main() {
                     required date,
                     required status,
                     required workSessions,
+                    required hasAdditionalShift,
+                    required isOvernight,
                     required memo,
                   }) async {},
             ),
@@ -293,6 +406,76 @@ void main() {
     );
 
     expect(find.text('2026년 5월'), findsWidgets);
+    expect(
+      find.byKey(const ValueKey('calendarAdditional-2026-5-5')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('calendarOvernight-2026-5-5')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('calendarOvernightContinuation-2026-5-6')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('calendarAdditionalSummary-2026-5-5')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('calendarOvernightSummary-2026-5-5')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('overnight work stays linked across a month boundary', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CalendarView(
+            today: DateTime(2026, 6, 1),
+            focusedMonth: DateTime(2026, 6),
+            selectedDate: DateTime(2026, 6, 1),
+            recordFor:
+                (date) =>
+                    date.year == 2026 && date.month == 5 && date.day == 31
+                        ? const AttendanceRecord(
+                          status: AttendanceStatus.overtime,
+                          isOvernight: true,
+                        )
+                        : null,
+            summary: const MonthSummary(
+              present: 0,
+              overtime: 0,
+              rest: 0,
+              halfDay: 0,
+              absent: 0,
+              unrecorded: 30,
+            ),
+            onPreviousMonth: () {},
+            onNextMonth: () {},
+            onSelectDate: (_) {},
+            onSaveDetail:
+                ({
+                  required date,
+                  required status,
+                  required workSessions,
+                  required hasAdditionalShift,
+                  required isOvernight,
+                  required memo,
+                }) async {},
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey('calendarOvernightContinuation-2026-6-1')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -314,6 +497,8 @@ void main() {
             endTime: TimeOfDay(hour: 17, minute: 0),
           ),
         ],
+        hasAdditionalShift: true,
+        isOvernight: true,
         memo: '수정 저장',
       ),
     );
@@ -324,6 +509,8 @@ void main() {
 
     expect(saved?.status, AttendanceStatus.present);
     expect(saved?.workSessions, hasLength(2));
+    expect(saved?.hasAdditionalShift, isTrue);
+    expect(saved?.isOvernight, isTrue);
     expect(saved?.memo, '수정 저장');
   });
 }

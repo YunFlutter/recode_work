@@ -6,6 +6,7 @@ import '../../../../domain/models/work_session.dart';
 import '../../../core/date_formatters.dart';
 import '../view_models/attendance_view_model.dart';
 import '../widgets/attendance_common_widgets.dart';
+import '../widgets/work_quick_actions.dart';
 import '../widgets/work_sessions_editor.dart';
 
 class LargeTextAttendanceView extends StatelessWidget {
@@ -80,7 +81,7 @@ class _LargeTodayPage extends StatelessWidget {
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 6),
-        _LargeWorkSessionsEditor(
+        _LargeWorkRecordEditor(
           viewModel: viewModel,
           date: viewModel.today,
           record: record,
@@ -155,7 +156,7 @@ class _LargeDateListPage extends StatelessWidget {
                 const SizedBox(height: 10),
               ],
               const SizedBox(height: 8),
-              _LargeWorkSessionsEditor(
+              _LargeWorkRecordEditor(
                 viewModel: viewModel,
                 date: viewModel.selectedDate,
                 record: selectedRecord,
@@ -173,6 +174,11 @@ class _LargeDateListPage extends StatelessWidget {
           _LargeDateTile(
             date: date,
             record: viewModel.recordFor(date),
+            continuesOvernight:
+                viewModel
+                    .recordFor(date.subtract(const Duration(days: 1)))
+                    ?.isOvernight ??
+                false,
             selected: isSameDate(date, viewModel.selectedDate),
             onTap: () => viewModel.selectDate(date),
           ),
@@ -191,8 +197,8 @@ class _LargeDateListPage extends StatelessWidget {
   }
 }
 
-class _LargeWorkSessionsEditor extends StatelessWidget {
-  const _LargeWorkSessionsEditor({
+class _LargeWorkRecordEditor extends StatelessWidget {
+  const _LargeWorkRecordEditor({
     required this.viewModel,
     required this.date,
     required this.record,
@@ -205,17 +211,76 @@ class _LargeWorkSessionsEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AttendancePanel(
-      child: WorkSessionsEditor(
-        sessions: record?.workSessions ?? const <WorkSession>[],
-        largeText: true,
-        onChanged:
-            (workSessions) => viewModel.saveDetail(
-              date: date,
-              status: record?.status ?? AttendanceStatus.present,
-              workSessions: workSessions,
-              memo: record?.memo ?? '',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          WorkQuickActions(
+            hasAdditionalShift: record?.hasAdditionalShift ?? false,
+            isOvernight: record?.isOvernight ?? false,
+            largeText: true,
+            onChanged: _saveQuickActions,
+          ),
+          const SizedBox(height: 12),
+          Material(
+            color: Colors.transparent,
+            child: ExpansionTile(
+              key: const ValueKey('largeOptionalTimeEditor'),
+              tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+              childrenPadding: const EdgeInsets.only(bottom: 12),
+              title: const Text(
+                '시간도 적기 (선택)',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              ),
+              subtitle: const Text(
+                '필요할 때만 열어 주세요.',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              children: [
+                WorkSessionsEditor(
+                  sessions: record?.workSessions ?? const <WorkSession>[],
+                  largeText: true,
+                  onChanged:
+                      (workSessions) => viewModel.saveDetail(
+                        date: date,
+                        status: record?.status ?? AttendanceStatus.present,
+                        workSessions: workSessions,
+                        hasAdditionalShift: record?.hasAdditionalShift ?? false,
+                        isOvernight: record?.isOvernight ?? false,
+                        memo: record?.memo ?? '',
+                      ),
+                ),
+              ],
             ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Future<void> _saveQuickActions({
+    required bool hasAdditionalShift,
+    required bool isOvernight,
+  }) async {
+    final currentStatus = record?.status ?? AttendanceStatus.present;
+    var nextStatus = currentStatus;
+    if (isOvernight) {
+      nextStatus = AttendanceStatus.overtime;
+    } else if (record?.isOvernight == true &&
+        currentStatus == AttendanceStatus.overtime) {
+      nextStatus = AttendanceStatus.present;
+    } else if (hasAdditionalShift &&
+        (currentStatus == AttendanceStatus.absent ||
+            currentStatus == AttendanceStatus.rest)) {
+      nextStatus = AttendanceStatus.present;
+    }
+
+    await viewModel.saveDetail(
+      date: date,
+      status: nextStatus,
+      workSessions: record?.workSessions ?? const <WorkSession>[],
+      hasAdditionalShift: hasAdditionalShift,
+      isOvernight: isOvernight,
+      memo: record?.memo ?? '',
     );
   }
 }
@@ -224,12 +289,14 @@ class _LargeDateTile extends StatelessWidget {
   const _LargeDateTile({
     required this.date,
     required this.record,
+    required this.continuesOvernight,
     required this.selected,
     required this.onTap,
   });
 
   final DateTime date;
   final AttendanceRecord? record;
+  final bool continuesOvernight;
   final bool selected;
   final VoidCallback onTap;
 
@@ -237,6 +304,8 @@ class _LargeDateTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = record?.status;
     final color = status?.color ?? const Color(0xFF2563EB);
+    final isOvernight = record?.isOvernight ?? false;
+    final connectionColor = const Color(0xFF6D28D9);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -247,23 +316,60 @@ class _LargeDateTile extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
-            color: selected ? color : const Color(0xFFD1D5DB),
-            width: selected ? 2.5 : 1.2,
+            color:
+                isOvernight || continuesOvernight
+                    ? connectionColor
+                    : selected
+                    ? color
+                    : const Color(0xFFD1D5DB),
+            width: selected || isOvernight || continuesOvernight ? 2.5 : 1.2,
           ),
         ),
         title: Text(
           formatFullDate(date),
           style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900),
         ),
-        subtitle: Text(
-          record?.isAutomaticDefault == true
-              ? '${status!.label} - 자동 표시'
-              : status?.label ?? '미기록',
-          style: TextStyle(
-            color: color,
-            fontSize: 19,
-            fontWeight: FontWeight.w800,
-          ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              record?.isAutomaticDefault == true
+                  ? '${status!.label} - 자동 표시'
+                  : status?.label ?? '미기록',
+              style: TextStyle(
+                color: color,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (record?.hasAdditionalShift == true)
+              const Text(
+                '오후 추가 출근',
+                style: TextStyle(
+                  color: Color(0xFF92400E),
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            if (isOvernight)
+              Text(
+                '다음날까지 야근  →  ${date.add(const Duration(days: 1)).day}일',
+                style: const TextStyle(
+                  color: Color(0xFF6D28D9),
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            if (continuesOvernight)
+              Text(
+                '←  ${date.subtract(const Duration(days: 1)).day}일부터 이어진 야근',
+                style: const TextStyle(
+                  color: Color(0xFF6D28D9),
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+          ],
         ),
       ),
     );

@@ -90,7 +90,7 @@ class FirestoreAttendanceRemoteDataSource
   Map<String, Object?> _documentData(AttendanceRecord record) {
     return <String, Object?>{
       ...AttendanceRecordDto.fromDomain(record).toJson(),
-      'schemaVersion': 2,
+      'schemaVersion': 3,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }

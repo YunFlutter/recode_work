@@ -19,6 +19,8 @@ void main() {
           endTime: TimeOfDay(hour: 21, minute: 5),
         ),
       ],
+      hasAdditionalShift: true,
+      isOvernight: true,
       memo: '야간 작업',
     );
 
@@ -38,6 +40,8 @@ void main() {
           'endTime': <String, int>{'hour': 21, 'minute': 5},
         },
       ],
+      'hasAdditionalShift': true,
+      'isOvernight': true,
       'memo': '야간 작업',
     });
 
@@ -46,6 +50,8 @@ void main() {
     expect(restored.startTime, const TimeOfDay(hour: 8, minute: 30));
     expect(restored.endTime, const TimeOfDay(hour: 12, minute: 0));
     expect(restored.workSessions, hasLength(2));
+    expect(restored.hasAdditionalShift, isTrue);
+    expect(restored.isOvernight, isTrue);
     expect(
       restored.workSessions.last.endTime,
       const TimeOfDay(hour: 21, minute: 5),
@@ -63,6 +69,8 @@ void main() {
         }).toDomain();
 
     expect(restored.workSessions, hasLength(1));
+    expect(restored.hasAdditionalShift, isFalse);
+    expect(restored.isOvernight, isFalse);
     expect(
       restored.workSessions.single.startTime,
       const TimeOfDay(hour: 9, minute: 0),

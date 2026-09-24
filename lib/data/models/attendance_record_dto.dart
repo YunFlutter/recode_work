@@ -8,6 +8,8 @@ class AttendanceRecordDto {
   const AttendanceRecordDto({
     required this.status,
     required this.workSessions,
+    required this.hasAdditionalShift,
+    required this.isOvernight,
     required this.memo,
   });
 
@@ -22,6 +24,8 @@ class AttendanceRecordDto {
             ),
           )
           .toList(growable: false),
+      hasAdditionalShift: record.hasAdditionalShift,
+      isOvernight: record.isOvernight,
       memo: record.memo,
     );
   }
@@ -45,16 +49,30 @@ class AttendanceRecordDto {
     }
 
     final workSessions = _workSessionsFromJson(json);
+    final hasAdditionalShift = _optionalBool(
+      json,
+      'hasAdditionalShift',
+      '오후 추가 출근 값이 올바르지 않습니다.',
+    );
+    final isOvernight = _optionalBool(
+      json,
+      'isOvernight',
+      '다음날까지 야근 값이 올바르지 않습니다.',
+    );
 
     return AttendanceRecordDto(
       status: statusName,
       workSessions: workSessions,
+      hasAdditionalShift: hasAdditionalShift,
+      isOvernight: isOvernight,
       memo: memo as String? ?? '',
     );
   }
 
   final String status;
   final List<WorkSessionDto> workSessions;
+  final bool hasAdditionalShift;
+  final bool isOvernight;
   final String memo;
 
   Map<String, Object?> toJson() {
@@ -68,6 +86,8 @@ class AttendanceRecordDto {
       'workSessions': workSessions
           .map((session) => session.toJson())
           .toList(growable: false),
+      'hasAdditionalShift': hasAdditionalShift,
+      'isOvernight': isOvernight,
       'memo': memo,
     };
   }
@@ -83,6 +103,8 @@ class AttendanceRecordDto {
             ),
           )
           .toList(growable: false),
+      hasAdditionalShift: hasAdditionalShift,
+      isOvernight: isOvernight,
       memo: memo,
     );
   }
@@ -145,6 +167,21 @@ class AttendanceRecordDto {
     return <WorkSessionDto>[
       WorkSessionDto(startTime: legacyStartTime, endTime: legacyEndTime),
     ];
+  }
+
+  static bool _optionalBool(
+    Map<String, dynamic> json,
+    String key,
+    String errorMessage,
+  ) {
+    final value = json[key];
+    if (value == null) {
+      return false;
+    }
+    if (value is! bool) {
+      throw FormatException(errorMessage);
+    }
+    return value;
   }
 
   static TimeOfDay? _timeFromMap(Map<String, int>? time) {
