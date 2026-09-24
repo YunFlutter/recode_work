@@ -4,6 +4,7 @@ import 'package:recode_works/data/repositories/attendance_repository.dart';
 import 'package:recode_works/domain/models/attendance_record.dart';
 import 'package:recode_works/domain/models/attendance_status.dart';
 import 'package:recode_works/domain/models/month_summary.dart';
+import 'package:recode_works/domain/models/work_session.dart';
 import 'package:recode_works/main.dart';
 import 'package:recode_works/ui/features/attendance/views/calendar_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -111,8 +112,7 @@ void main() {
               onSave: ({
                 required date,
                 required status,
-                required startTime,
-                required endTime,
+                required workSessions,
                 required memo,
               }) async {
                 savedStatus = status;
@@ -138,13 +138,15 @@ void main() {
           body: SingleChildScrollView(
             child: RecordEditor(
               date: DateTime(2026, 5, 1),
-              record: const AttendanceRecord(status: AttendanceStatus.present),
+              record: const AttendanceRecord(
+                status: AttendanceStatus.present,
+                workSessions: <WorkSession>[WorkSession()],
+              ),
               onSave:
                   ({
                     required date,
                     required status,
-                    required startTime,
-                    required endTime,
+                    required workSessions,
                     required memo,
                   }) async {},
             ),
@@ -155,6 +157,90 @@ void main() {
 
     expect(find.text('야근'), findsOneWidget);
     expect(find.text('시간 선택'), findsNWidgets(2));
+  });
+
+  testWidgets(
+    'record editor adds multiple work sessions and saves each change',
+    (tester) async {
+      List<WorkSession>? savedWorkSessions;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: RecordEditor(
+                date: DateTime(2026, 5, 1),
+                record: const AttendanceRecord(
+                  status: AttendanceStatus.present,
+                ),
+                onSave: ({
+                  required date,
+                  required status,
+                  required workSessions,
+                  required memo,
+                }) async {
+                  savedWorkSessions = List<WorkSession>.of(workSessions);
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('addWorkSessionButton')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('addWorkSessionButton')));
+      await tester.pump();
+
+      expect(savedWorkSessions, hasLength(2));
+      expect(find.text('근무 1'), findsOneWidget);
+      expect(find.text('근무 2'), findsOneWidget);
+    },
+  );
+
+  testWidgets('multiple work sessions tolerate narrow large-text layouts', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 1000),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: SingleChildScrollView(
+              child: RecordEditor(
+                date: DateTime(2026, 5, 1),
+                record: const AttendanceRecord(
+                  status: AttendanceStatus.present,
+                  workSessions: <WorkSession>[
+                    WorkSession(
+                      startTime: TimeOfDay(hour: 8, minute: 0),
+                      endTime: TimeOfDay(hour: 12, minute: 0),
+                    ),
+                    WorkSession(
+                      startTime: TimeOfDay(hour: 13, minute: 0),
+                      endTime: TimeOfDay(hour: 17, minute: 0),
+                    ),
+                  ],
+                ),
+                onSave:
+                    ({
+                      required date,
+                      required status,
+                      required workSessions,
+                      required memo,
+                    }) async {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('근무 1'), findsOneWidget);
+    expect(find.text('근무 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('calendar layout tolerates large system text', (tester) async {
@@ -197,8 +283,7 @@ void main() {
                   ({
                     required date,
                     required status,
-                    required startTime,
-                    required endTime,
+                    required workSessions,
                     required memo,
                   }) async {},
             ),
@@ -217,7 +302,20 @@ void main() {
 
     await repository.save(
       DateTime(2026, 5, 1),
-      const AttendanceRecord(status: AttendanceStatus.present, memo: '수정 저장'),
+      const AttendanceRecord(
+        status: AttendanceStatus.present,
+        workSessions: <WorkSession>[
+          WorkSession(
+            startTime: TimeOfDay(hour: 8, minute: 0),
+            endTime: TimeOfDay(hour: 12, minute: 0),
+          ),
+          WorkSession(
+            startTime: TimeOfDay(hour: 13, minute: 0),
+            endTime: TimeOfDay(hour: 17, minute: 0),
+          ),
+        ],
+        memo: '수정 저장',
+      ),
     );
 
     final reloadedRepository =
@@ -225,6 +323,7 @@ void main() {
     final saved = reloadedRepository.getByDate(DateTime(2026, 5, 1));
 
     expect(saved?.status, AttendanceStatus.present);
+    expect(saved?.workSessions, hasLength(2));
     expect(saved?.memo, '수정 저장');
   });
 }

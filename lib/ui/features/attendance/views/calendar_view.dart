@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import '../../../../domain/models/attendance_record.dart';
 import '../../../../domain/models/attendance_status.dart';
 import '../../../../domain/models/month_summary.dart';
+import '../../../../domain/models/work_session.dart';
 import '../../../core/date_formatters.dart';
 import '../widgets/attendance_common_widgets.dart';
+import '../widgets/work_sessions_editor.dart';
 
 class CalendarView extends StatelessWidget {
   const CalendarView({
@@ -33,8 +35,7 @@ class CalendarView extends StatelessWidget {
   final Future<void> Function({
     required DateTime date,
     required AttendanceStatus status,
-    required TimeOfDay? startTime,
-    required TimeOfDay? endTime,
+    required List<WorkSession> workSessions,
     required String memo,
   })
   onSaveDetail;
@@ -252,8 +253,7 @@ class RecordEditor extends StatefulWidget {
   final Future<void> Function({
     required DateTime date,
     required AttendanceStatus status,
-    required TimeOfDay? startTime,
-    required TimeOfDay? endTime,
+    required List<WorkSession> workSessions,
     required String memo,
   })
   onSave;
@@ -265,8 +265,9 @@ class RecordEditor extends StatefulWidget {
 class _RecordEditorState extends State<RecordEditor> {
   late AttendanceStatus _status =
       widget.record?.status ?? AttendanceStatus.present;
-  late TimeOfDay? _startTime = widget.record?.startTime;
-  late TimeOfDay? _endTime = widget.record?.endTime;
+  late List<WorkSession> _workSessions = List<WorkSession>.of(
+    widget.record?.workSessions ?? const <WorkSession>[],
+  );
   late final TextEditingController _memoController = TextEditingController(
     text: widget.record?.memo ?? '',
   );
@@ -283,8 +284,7 @@ class _RecordEditorState extends State<RecordEditor> {
     await widget.onSave(
       date: widget.date,
       status: _status,
-      startTime: _startTime,
-      endTime: _endTime,
+      workSessions: _workSessions,
       memo: _memoController.text,
     );
   }
@@ -294,29 +294,8 @@ class _RecordEditorState extends State<RecordEditor> {
     _memoSaveTimer = Timer(const Duration(milliseconds: 500), _saveNow);
   }
 
-  Future<void> _pickStartTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _startTime ?? TimeOfDay.now(),
-    );
-    if (picked == null) {
-      return;
-    }
-
-    setState(() => _startTime = picked);
-    await _saveNow();
-  }
-
-  Future<void> _pickEndTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: _endTime ?? TimeOfDay.now(),
-    );
-    if (picked == null) {
-      return;
-    }
-
-    setState(() => _endTime = picked);
+  Future<void> _updateWorkSessions(List<WorkSession> workSessions) async {
+    setState(() => _workSessions = List<WorkSession>.of(workSessions));
     await _saveNow();
   }
 
@@ -385,32 +364,9 @@ class _RecordEditorState extends State<RecordEditor> {
                 }).toList(),
           ),
           const SizedBox(height: 18),
-          TimeRow(
-            label: '출근 시간',
-            time: _startTime,
-            onPickTime: _pickStartTime,
-            onUseNow: () {
-              setState(() => _startTime = TimeOfDay.now());
-              _saveNow();
-            },
-            onClear: () {
-              setState(() => _startTime = null);
-              _saveNow();
-            },
-          ),
-          const SizedBox(height: 10),
-          TimeRow(
-            label: '퇴근 시간',
-            time: _endTime,
-            onPickTime: _pickEndTime,
-            onUseNow: () {
-              setState(() => _endTime = TimeOfDay.now());
-              _saveNow();
-            },
-            onClear: () {
-              setState(() => _endTime = null);
-              _saveNow();
-            },
+          WorkSessionsEditor(
+            sessions: _workSessions,
+            onChanged: _updateWorkSessions,
           ),
           const SizedBox(height: 18),
           TextField(
@@ -434,97 +390,6 @@ class _RecordEditorState extends State<RecordEditor> {
           const NoticeBox(text: '상태, 시간, 메모를 바꾸면 자동으로 저장됩니다.'),
         ],
       ),
-    );
-  }
-}
-
-class TimeRow extends StatelessWidget {
-  const TimeRow({
-    super.key,
-    required this.label,
-    required this.time,
-    required this.onPickTime,
-    required this.onUseNow,
-    required this.onClear,
-  });
-
-  final String label;
-  final TimeOfDay? time;
-  final VoidCallback onPickTime;
-  final VoidCallback onUseNow;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFF59E0B)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '$label: ${time == null ? '없음' : formatTime(time!)}',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _TimeActionButton(
-                icon: Icons.edit_calendar,
-                label: '시간 선택',
-                onPressed: onPickTime,
-              ),
-              _TimeActionButton(
-                icon: Icons.access_time,
-                label: '현재 시간',
-                onPressed: onUseNow,
-              ),
-              _TimeActionButton(label: '비움', onPressed: onClear),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TimeActionButton extends StatelessWidget {
-  const _TimeActionButton({
-    required this.label,
-    required this.onPressed,
-    this.icon,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final buttonStyle = OutlinedButton.styleFrom(
-      minimumSize: const Size(118, 50),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    );
-
-    if (icon == null) {
-      return OutlinedButton(
-        onPressed: onPressed,
-        style: buttonStyle,
-        child: const FittedBox(fit: BoxFit.scaleDown, child: Text('비움')),
-      );
-    }
-
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      style: buttonStyle,
-      icon: Icon(icon, size: 26),
-      label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
     );
   }
 }

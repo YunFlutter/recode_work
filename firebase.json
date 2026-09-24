@@ -1,0 +1,24 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "recode-work",
+          "appId": "1:876722088106:android:a5bdd27ccb223454a448d3",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "recode-work",
+          "configurations": {
+            "android": "1:876722088106:android:a5bdd27ccb223454a448d3"
+          }
+        }
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import '../../../../data/repositories/attendance_repository.dart';
 import '../../../../domain/models/attendance_record.dart';
 import '../../../../domain/models/attendance_status.dart';
 import '../../../../domain/models/month_summary.dart';
+import '../../../../domain/models/work_session.dart';
 import '../../../core/date_formatters.dart';
 
 class AttendanceViewModel extends ChangeNotifier {
@@ -140,8 +141,7 @@ class AttendanceViewModel extends ChangeNotifier {
       key,
       AttendanceRecord(
         status: status,
-        startTime: previous?.startTime,
-        endTime: previous?.endTime,
+        workSessions: previous?.workSessions ?? const <WorkSession>[],
         memo: previous?.memo ?? '',
       ),
     );
@@ -154,8 +154,7 @@ class AttendanceViewModel extends ChangeNotifier {
   Future<void> saveDetail({
     required DateTime date,
     required AttendanceStatus status,
-    required TimeOfDay? startTime,
-    required TimeOfDay? endTime,
+    required List<WorkSession> workSessions,
     required String memo,
   }) async {
     final key = dateOnly(date);
@@ -163,8 +162,7 @@ class AttendanceViewModel extends ChangeNotifier {
       key,
       AttendanceRecord(
         status: status,
-        startTime: startTime,
-        endTime: endTime,
+        workSessions: List<WorkSession>.unmodifiable(workSessions),
         memo: memo.trim(),
       ),
     );

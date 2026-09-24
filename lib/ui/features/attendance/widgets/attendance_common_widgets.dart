@@ -64,6 +64,7 @@ class StatusPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = record?.status;
     final color = status?.color ?? const Color(0xFF2563EB);
+    final workSessionCount = record?.workSessions.length ?? 0;
 
     return AttendancePanel(
       color:
@@ -116,6 +117,18 @@ class StatusPanel extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (workSessionCount > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '근무 시간 $workSessionCount회 기록됨',
+                  textAlign:
+                      useVerticalLayout ? TextAlign.center : TextAlign.start,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ],
           );
 

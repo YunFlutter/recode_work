@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "876722088106",
+    "project_id": "recode-work",
+    "storage_bucket": "recode-work.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:876722088106:android:a5bdd27ccb223454a448d3",
+        "android_client_info": {
+          "package_name": "com.example.recode_works"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAO6iXPmNyvGznKSAMJVFoylEdGHmEJn58"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

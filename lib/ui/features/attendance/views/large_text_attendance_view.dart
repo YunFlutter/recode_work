@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../domain/models/attendance_record.dart';
 import '../../../../domain/models/attendance_status.dart';
+import '../../../../domain/models/work_session.dart';
 import '../../../core/date_formatters.dart';
 import '../view_models/attendance_view_model.dart';
 import '../widgets/attendance_common_widgets.dart';
+import '../widgets/work_sessions_editor.dart';
 
 class LargeTextAttendanceView extends StatelessWidget {
   const LargeTextAttendanceView({super.key, required this.viewModel});
@@ -78,7 +80,7 @@ class _LargeTodayPage extends StatelessWidget {
           const SizedBox(height: 12),
         ],
         const SizedBox(height: 6),
-        _LargeTimeEditor(
+        _LargeWorkSessionsEditor(
           viewModel: viewModel,
           date: viewModel.today,
           record: record,
@@ -153,7 +155,7 @@ class _LargeDateListPage extends StatelessWidget {
                 const SizedBox(height: 10),
               ],
               const SizedBox(height: 8),
-              _LargeTimeEditor(
+              _LargeWorkSessionsEditor(
                 viewModel: viewModel,
                 date: viewModel.selectedDate,
                 record: selectedRecord,
@@ -189,8 +191,8 @@ class _LargeDateListPage extends StatelessWidget {
   }
 }
 
-class _LargeTimeEditor extends StatelessWidget {
-  const _LargeTimeEditor({
+class _LargeWorkSessionsEditor extends StatelessWidget {
+  const _LargeWorkSessionsEditor({
     required this.viewModel,
     required this.date,
     required this.record,
@@ -202,87 +204,17 @@ class _LargeTimeEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final startText =
-        record?.startTime == null ? '없음' : formatTime(record!.startTime!);
-    final endText =
-        record?.endTime == null ? '없음' : formatTime(record!.endTime!);
-
     return AttendancePanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            '시간 입력',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '출근 시간: $startText',
-            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          _LargeTimeButton(
-            label: '출근 시간 선택',
-            icon: Icons.login,
-            onPressed: () => _pickTime(context, isStart: true),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            '퇴근 시간: $endText',
-            style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          _LargeTimeButton(
-            label: '퇴근 시간 선택',
-            icon: Icons.logout,
-            onPressed: () => _pickTime(context, isStart: false),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _pickTime(BuildContext context, {required bool isStart}) async {
-    final current = isStart ? record?.startTime : record?.endTime;
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: current ?? TimeOfDay.now(),
-    );
-    if (picked == null) {
-      return;
-    }
-
-    await viewModel.saveDetail(
-      date: date,
-      status: record?.status ?? AttendanceStatus.present,
-      startTime: isStart ? picked : record?.startTime,
-      endTime: isStart ? record?.endTime : picked,
-      memo: record?.memo ?? '',
-    );
-  }
-}
-
-class _LargeTimeButton extends StatelessWidget {
-  const _LargeTimeButton({
-    required this.label,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon, size: 30),
-      label: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(62),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        textStyle: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+      child: WorkSessionsEditor(
+        sessions: record?.workSessions ?? const <WorkSession>[],
+        largeText: true,
+        onChanged:
+            (workSessions) => viewModel.saveDetail(
+              date: date,
+              status: record?.status ?? AttendanceStatus.present,
+              workSessions: workSessions,
+              memo: record?.memo ?? '',
+            ),
       ),
     );
   }

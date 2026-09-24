@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'data/repositories/attendance_repository.dart';
+import 'data/repositories/attendance_repository_factory.dart';
 import 'ui/core/app_theme.dart';
 import 'ui/features/attendance/view_models/attendance_view_model.dart';
 import 'ui/features/attendance/views/attendance_home_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final repository = await SharedPreferencesAttendanceRepository.create();
+  final repository = await AttendanceRepositoryFactory.create();
   runApp(AttendanceBookApp(repository: repository));
 }
 

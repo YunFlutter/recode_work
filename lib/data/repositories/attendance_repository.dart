@@ -1,10 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/attendance_record.dart';
-import '../../domain/models/attendance_status.dart';
+import '../models/attendance_record_dto.dart';
 
 abstract class AttendanceRepository {
   Map<DateTime, AttendanceRecord> getAll();
@@ -75,63 +74,32 @@ class SharedPreferencesAttendanceRepository implements AttendanceRepository {
       return <DateTime, AttendanceRecord>{};
     }
 
-    return decoded.map((dateKey, value) {
-      final recordJson = value as Map<String, dynamic>;
-      return MapEntry(_dateFromKey(dateKey), _recordFromJson(recordJson));
-    });
+    final records = <DateTime, AttendanceRecord>{};
+    for (final entry in decoded.entries) {
+      if (entry.value is! Map<String, dynamic>) {
+        continue;
+      }
+      try {
+        final dto = AttendanceRecordDto.fromJson(
+          entry.value as Map<String, dynamic>,
+        );
+        records[attendanceDateFromKey(entry.key)] = dto.toDomain();
+      } on FormatException {
+        // Keep loading the remaining valid local records.
+      }
+    }
+    return records;
   }
 
   static Map<String, Object?> _encodeRecords(
     Map<DateTime, AttendanceRecord> records,
   ) {
     return records.map((date, record) {
-      return MapEntry(_dateKey(date), _recordToJson(record));
+      return MapEntry(
+        attendanceDateKey(date),
+        AttendanceRecordDto.fromDomain(record).toJson(),
+      );
     });
-  }
-
-  static Map<String, Object?> _recordToJson(AttendanceRecord record) {
-    return <String, Object?>{
-      'status': record.status.name,
-      'startTime': _timeToJson(record.startTime),
-      'endTime': _timeToJson(record.endTime),
-      'memo': record.memo,
-    };
-  }
-
-  static AttendanceRecord _recordFromJson(Map<String, dynamic> json) {
-    return AttendanceRecord(
-      status: AttendanceStatus.values.byName(json['status'] as String),
-      startTime: _timeFromJson(json['startTime']),
-      endTime: _timeFromJson(json['endTime']),
-      memo: json['memo'] as String? ?? '',
-    );
-  }
-
-  static Map<String, int>? _timeToJson(TimeOfDay? time) {
-    if (time == null) {
-      return null;
-    }
-    return <String, int>{'hour': time.hour, 'minute': time.minute};
-  }
-
-  static TimeOfDay? _timeFromJson(Object? json) {
-    if (json is! Map<String, dynamic>) {
-      return null;
-    }
-    return TimeOfDay(hour: json['hour'] as int, minute: json['minute'] as int);
-  }
-
-  static DateTime _dateFromKey(String key) {
-    final parts = key.split('-').map(int.parse).toList();
-    return DateTime(parts[0], parts[1], parts[2]);
-  }
-
-  static String _dateKey(DateTime date) {
-    final normalized = _dateOnly(date);
-    final year = normalized.year.toString().padLeft(4, '0');
-    final month = normalized.month.toString().padLeft(2, '0');
-    final day = normalized.day.toString().padLeft(2, '0');
-    return '$year-$month-$day';
   }
 }
 

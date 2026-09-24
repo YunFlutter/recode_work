@@ -1,16 +1,33 @@
-# recode_works
+# 출근 기록부
 
-A new Flutter project.
+70대 사용자를 위한 큰 글씨 대응 Android 출근 기록 앱입니다. 기록은 먼저
+`shared_preferences`의 기존 `attendance_records_v1` 구조에 저장되고, 연결 가능한
+경우 Cloud Firestore에도 동기화됩니다.
 
-## Getting Started
+## Firebase 동기화
 
-This project is a starting point for a Flutter application.
+- Firebase 프로젝트: `recode-work`
+- 경로: `attendance_devices/{기기 키}/records/{YYYY-MM-DD}`
+- 로그인 화면 없이 Firebase 익명 인증 세션을 자동으로 발급합니다.
+- 기기 키: 실제 하드웨어 시리얼 대신 Android 정책상 권한 없이 사용할 수 있는
+  `ANDROID_ID`를 SHA-256으로 변환한 값
+- 시작 시 병합: 같은 날짜가 양쪽에 있으면 로컬 기록을 우선하며, Firebase에만 있는
+  날짜는 로컬로 복원합니다.
+- 하루에 근무 시간을 최대 10회까지 각각 추가·수정·삭제할 수 있으며 변경 즉시
+  로컬과 Firebase에 저장합니다.
+- 저장 순서: 로컬 저장을 먼저 끝낸 후 Firebase에 전송하므로 네트워크 오류가 로컬
+  기록을 막지 않습니다.
+- 삭제 동작은 없으며 Firestore 규칙에서도 삭제를 차단합니다.
 
-A few resources to get you started if this is your first Flutter project:
+Firebase 규칙은 인증된 익명 세션과 올바른 기기 키·날짜·기록 형식을 모두 확인합니다.
+재설치하면 익명 사용자 ID는 바뀔 수 있으므로 데이터 구분과 복원에는 익명 사용자 ID가
+아닌 기기 키를 사용합니다. 기기 키는 추측하기 어렵게 해시 처리하지만 계정 로그인으로
+사용자를 구분하는 방식과 같은 수준의 보안은 아닙니다.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+예전 로컬 데이터의 `startTime`과 `endTime`은 첫 번째 근무 시간으로 자동 변환합니다.
+새 데이터에도 이 두 필드를 첫 번째 근무 시간과 함께 유지하므로 기존 저장 구조와의
+호환성을 유지합니다.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+기존 기록을 재설치 후 복원하려면 앱을 삭제하기 전에 Firebase 동기화가 포함된 버전을
+한 번 실행해 업로드해야 합니다. 앱을 먼저 삭제하면 Android가 기존 앱의 로컬 저장소를
+제거하므로 아직 업로드하지 않은 기록은 복원할 수 없습니다.
